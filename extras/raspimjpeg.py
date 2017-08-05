@@ -18,15 +18,19 @@
 
 
 import argparse
+import cStringIO
+import cv2
 import io
 import logging
-import picamera
 import signal
 import sys
 import time
 
+from picamera import PiCamera
+from picamera.array import PiRGBArray
+from PIL import Image
 
-VERSION = '0.8'
+VERSION = '0.9+owenthewizard-opencv'
 
 options = None
 camera = None
@@ -221,7 +225,7 @@ def init_camera():
     logging.debug('initializing camera')
 
     logging.debug('using resolution %dx%d' % (options.width, options.height))
-    camera = picamera.PiCamera(resolution=(options.width, options.height))
+    camera = PiCamera(resolution=(options.width, options.height))
     
     logging.debug('using framerate = %d' % options.framerate)
     camera.framerate = options.framerate
@@ -308,8 +312,21 @@ def streams_iter():
 
 def run():
     logging.debug('starting capture')
-    camera.capture_sequence(streams_iter(), format='jpeg',
-            use_video_port=not options.stills, thumbnail=None, quality=options.quality)
+    rawCapture = PiRGBArray(camera, size=(options.width, options.height))
+    face_cascade = cv2.CascadeClassifier('/usr/share/OpenCV/haarcascade_frontalface_default.xml')
+    for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=not options.stills):
+        image = frame.array
+        gray = cv2.cvtColor(image,cv2.COLOR_BGR2GRAY)
+        faces = face_cascade.detectMultiScale(gray, 1.1, 5)
+        logging.info('found '+str(len(faces))+' face(s)')
+        for (x,y,w,h) in faces:
+            cv2.rectangle(image,(x,y),(x+w,y+h),(255,255,0),2)
+        destRGB = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        jpeg_image = Image.fromarray(destRGB)
+        output = cStringIO.StringIO()
+        jpeg_image.save(output, format='jpeg', quality=options.quality)
+        sys.stdout.write(output.getvalue())
+        rawCapture.truncate(0)
 
 
 if __name__ == '__main__':
