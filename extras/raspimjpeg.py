@@ -18,7 +18,6 @@
 
 
 import argparse
-import cStringIO
 import cv2
 import io
 import logging
@@ -28,7 +27,6 @@ import time
 
 from picamera import PiCamera
 from picamera.array import PiRGBArray
-from PIL import Image
 
 VERSION = '0.9+owenthewizard-opencv'
 
@@ -321,11 +319,7 @@ def run():
         logging.info('found '+str(len(faces))+' face(s)')
         for (x,y,w,h) in faces:
             cv2.rectangle(image,(x,y),(x+w,y+h),(255,255,0),2)
-        destRGB = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        jpeg_image = Image.fromarray(destRGB)
-        output = cStringIO.StringIO()
-        jpeg_image.save(output, format='jpeg', quality=options.quality)
-        sys.stdout.write(output.getvalue())
+        sys.stdout.write(cv2.imencode('.jpeg', image, [int(cv2.IMWRITE_JPEG_QUALITY), options.quality])[1])
         rawCapture.truncate(0)
 
 
